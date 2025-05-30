@@ -8,6 +8,7 @@ class BookCreate(BaseModel):
     book_name: str
     author_id: str  
     category_id: str 
+    is_available: bool = True
 
 
 # Used for creating an author
@@ -45,6 +46,11 @@ class CategoryDb(Category):
     class Config:
         populate_by_name = True
 
+class BookUpdate(BaseModel):
+    is_available: bool = True
+
+    class Config:
+        populate_by_name = True
 
 class BookResponse(BookCreate):
     id: str 
@@ -91,10 +97,16 @@ StudentWithIssuedBooks.update_forward_refs()
 class IssuedBook(BaseModel):
     book_id: str
     student_id: str
-    issued_date: datetime = Field(default_factory=datetime.utcnow)
+    issued_date: datetime
     return_date: datetime
     is_returned: bool = False
 
+class IssuedBookUpdate(BaseModel):
+
+    is_returned: bool = False
+
+    class Config:
+        populate_by_name = True
 
 # issued book response
 class IssuedBookResponse(IssuedBook):
@@ -133,3 +145,31 @@ class UserResponse(User):
 class UpdateUser(User):
     pass
 
+
+#  student fine model
+class StudentFine(BaseModel):
+    student_id: str
+    book_id: str
+    issued_book_id: str
+    fine_amount: float
+    fine_date: datetime = Field(default_factory=datetime.utcnow)
+    is_paid: bool = False
+
+
+# student fine response model
+class StudentFineResponse(StudentFine):
+    id: str
+
+    class Config:
+        populate_by_name = True
+
+
+# student fine update model
+class StudentFineUpdate(BaseModel):
+    fine_amount: float
+    is_paid: bool = False
+
+    class Config:
+        populate_by_name = True
+
+        

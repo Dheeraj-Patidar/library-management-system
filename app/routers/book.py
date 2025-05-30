@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException,Depends,Query
-from app.models import BookCreate,BookResponse,UserRole
+from app.models import BookCreate,BookResponse,UserRole,BookUpdate
 from bson import ObjectId
 from app.database.db import book_collection
 from app.routers.user import require_roles
@@ -40,7 +40,7 @@ async def get_book(book_id: str):
 
 
 @router.put("/{book_id}", response_model=BookResponse, dependencies=[Depends(require_roles(UserRole.librarian))])
-async def update_book(book_id: str, book_data: BookCreate):
+async def update_book(book_id: str, book_data: BookUpdate):
     update = book_data.dict()
     result = await book_collection.update_one(
         {"_id": ObjectId(book_id)},

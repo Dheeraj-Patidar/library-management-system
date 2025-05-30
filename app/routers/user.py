@@ -38,6 +38,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": token, "token_type": "bearer"}
 
 
+
 # get current user
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     payload = decode_token(token)

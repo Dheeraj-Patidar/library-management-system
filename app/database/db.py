@@ -9,6 +9,7 @@ book_collection = db.get_collection("books")
 issued_collection = db.get_collection("issuedbooks")
 student_collection = db.get_collection("students")
 user_collection = db.get_collection("users")
+student_fine_collection = db.get_collection("student_fines")
 
 async def get_db():
     return db
