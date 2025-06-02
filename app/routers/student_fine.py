@@ -45,7 +45,7 @@ async def create_student_fine(student_fine: StudentFine):
     if return_date and now > return_date and not is_returned:
         late_days = int((now - return_date).days)
         
-        student_fine_dict["fine_amount"] = late_days * 5
+        student_fine_dict["fine_amount"] = late_days * 50
     else:
         raise HTTPException(status_code=400, detail="Book is not overdue or already returned")
 

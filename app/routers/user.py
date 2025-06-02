@@ -2,7 +2,7 @@ from fastapi import  HTTPException, Depends,APIRouter,Query
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from app.auth import hash_password, verify_password, create_access_token, decode_token
 from app.models import UserResponse, UpdateUser,CreateUser,UserRole
-from app.database.db import user_collection
+from app.database.db import user_collection,student_fine_collection
 from bson import ObjectId
 from typing import List
 
@@ -133,3 +133,20 @@ async def get_user(user_id:str):
     
     return UserResponse(**user)
 
+# get all fines of user
+@router.get("/{user_id}/fines", dependencies=[Depends(require_roles(UserRole.admin))])
+async def get_user_fines(user_id : str):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=404, detail="Invalid user Id format")
+    
+    user = await user_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    fines_cursor = student_fine_collection.find({"student_id": ObjectId(user_id)})
+
+    fines = []
+    async for fine in fines_cursor:
+        fines.append(fine)
+    
+    return fines

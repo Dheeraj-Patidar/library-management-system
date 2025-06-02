@@ -1,0 +1,24 @@
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongodb
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/library
+    volumes:
+      - ./app:/app/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+  mongodb:
+    image: mongo:6.0
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:

@@ -1,6 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-
-MONGO_URL = "mongodb://localhost:27017"
+import os
+# MONGO_URL = "mongodb://localhost:27017/library"
+MONGO_URL = os.getenv("MONGODB_URI", "mongodb://localhost:27017/library")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client.library # database name
 author_collection = db.get_collection("authors")
