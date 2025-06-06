@@ -13,4 +13,5 @@ user_collection = db.get_collection("users")
 student_fine_collection = db.get_collection("student_fines")
 
 async def get_db():
+    print("Connecting to the database.........................................................................................")
     return db

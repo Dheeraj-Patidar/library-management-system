@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from bson import ObjectId
 from bson.errors import InvalidId
-from app.database.db import student_collection, issued_collection
+from app.database.db import get_db
 from typing import List
 from app.models import (
     Student,
@@ -20,19 +20,21 @@ def student_helper(student) -> Student:
         email=student["email"]
     )
 
-def issued_book_helper(doc) -> IssuedBookResponse:
-    return IssuedBookResponse(
-        id=str(doc["_id"]),
-        book_id=doc["book_id"],
-        student_id=doc["student_id"],
-        issued_date=doc["issued_date"],
-        return_date=doc["return_date"],
-        is_returned=doc["is_returned"]
-    )
+def issued_book_helper(doc) -> dict:
+    return {
+        "id": str(doc["_id"]),
+        "book_id": doc["book_id"],
+        "student_id": doc["student_id"],
+        "issued_date": doc["issued_date"],
+        "return_date": doc["return_date"],
+        "is_returned": doc["is_returned"]
+    }
+
 
 # Create Student
 @router.post("/", response_model=Student)
-async def create_student(student: StudentCreate):
+async def create_student(student: StudentCreate , db=Depends(get_db)):
+    student_collection = db["student_collection"]
     result = await student_collection.insert_one(student.dict())
     created = await student_collection.find_one({"_id": result.inserted_id})
     return student_helper(created)
@@ -40,7 +42,9 @@ async def create_student(student: StudentCreate):
 
 # Get All Students
 @router.get("/", response_model=List[StudentWithIssuedBooks])
-async def get_all_students(page: int = Query(1, ge=1),size: int = Query(10, ge=1, le=100)):
+async def get_all_students(page: int = Query(1, ge=1),size: int = Query(10, ge=1, le=100), db=Depends(get_db)):
+    student_collection = db["student_collection"]
+    issued_collection = db["issued_collection"]
     skip = (page - 1) * size
     limit = size
     students_with_books = []
@@ -73,7 +77,9 @@ async def get_all_students(page: int = Query(1, ge=1),size: int = Query(10, ge=1
 
 # Get Student by ID with Issued Books
 @router.get("/{student_id}", response_model=StudentWithIssuedBooks)
-async def get_student_with_issued_books(student_id: str):
+async def get_student_with_issued_books(student_id: str, db=Depends(get_db)):
+    student_collection = db["student_collection"]
+    issued_collection = db["issued_collection"]
     try:
         obj_id = ObjectId(student_id)
     except InvalidId:
@@ -98,7 +104,8 @@ async def get_student_with_issued_books(student_id: str):
 
 # Update Student
 @router.put("/{student_id}", response_model=Student)
-async def update_student(student_id: str, data: StudentCreate):
+async def update_student(student_id: str, data: StudentCreate, db=Depends(get_db)):
+    student_collection = db["student_collection"]
     try:
         obj_id = ObjectId(student_id)
     except InvalidId:
@@ -116,7 +123,8 @@ async def update_student(student_id: str, data: StudentCreate):
 
 # Delete Student
 @router.delete("/{student_id}")
-async def delete_student(student_id: str):
+async def delete_student(student_id: str, db=Depends(get_db)):
+    student_collection = db["student_collection"]
     try:
         obj_id = ObjectId(student_id)
     except InvalidId:

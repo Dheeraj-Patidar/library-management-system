@@ -136,7 +136,7 @@ class CreateUser(User):
 
 # user response model
 class UserResponse(User):
-    id: str
+    id: str 
 
     class Config:
         populate_by_name = True
@@ -145,6 +145,15 @@ class UserResponse(User):
 class UpdateUser(User):
     pass
 
+class FineResponse(BaseModel):
+    id: str = Field(..., alias="_id")
+    student_id: str
+    amount: float
+    reason: str
+    date: str  # or datetime if you parse it
+    
+    class Config:
+        populate_by_name = True
 
 #  student fine model
 class StudentFine(BaseModel):
@@ -172,4 +181,3 @@ class StudentFineUpdate(BaseModel):
     class Config:
         populate_by_name = True
 
-        

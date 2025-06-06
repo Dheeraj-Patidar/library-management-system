@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException,Query
 from app.models import Category,CategoryDb
 from bson import ObjectId
-from app.database.db import category_collection
-
+from app.database.db import get_db
+from fastapi import Depends
 
 router = APIRouter(prefix="/category",tags=['category'])
 
@@ -16,7 +16,8 @@ def category_helper(cat) -> dict:
 
 #  Create Category
 @router.post("/", response_model=CategoryDb)
-async def create_category(category: Category):
+async def create_category(category: Category, db=Depends(get_db)):
+    category_collection = db["category_collection"]
     cat = category.dict(by_alias=True, exclude_unset=True)
     result = await category_collection.insert_one(cat)
     new_cat = await category_collection.find_one({"_id": result.inserted_id})
@@ -24,7 +25,8 @@ async def create_category(category: Category):
 
 #  Get All Categories
 @router.get("/", response_model=list[CategoryDb])
-async def get_categories(page: int = Query(1, ge=1),size: int = Query(10, ge=1, le=100)):
+async def get_categories(page: int = Query(1, ge=1),size: int = Query(10, ge=1, le=100), db=Depends(get_db)):
+    category_collection = db["category_collection"]
     skip = (page - 1) * size
     limit = size
     categories = []
@@ -34,7 +36,8 @@ async def get_categories(page: int = Query(1, ge=1),size: int = Query(10, ge=1, 
 
 #  Get Category by ID
 @router.get("/{cat_id}", response_model=CategoryDb)
-async def get_category(cat_id: str):
+async def get_category(cat_id: str, db=Depends(get_db)):
+    category_collection = db["category_collection"]
     cat = await category_collection.find_one({"_id": ObjectId(cat_id)})
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
@@ -42,7 +45,8 @@ async def get_category(cat_id: str):
 
 #  Update Category
 @router.put("/{cat_id}", response_model=CategoryDb)
-async def update_category(cat_id: str, updated: Category):
+async def update_category(cat_id: str, updated: Category, db=Depends(get_db)):
+    category_collection = db["category_collection"]
     update_data = updated.dict(by_alias=True, exclude_unset=True)
     result = await category_collection.update_one(
         {"_id": ObjectId(cat_id)}, {"$set": update_data}
@@ -54,7 +58,8 @@ async def update_category(cat_id: str, updated: Category):
 
 #  Delete Category
 @router.delete("/{cat_id}")
-async def delete_category(cat_id: str):
+async def delete_category(cat_id: str, db=Depends(get_db)):
+    category_collection = db["category_collection"]
     result = await category_collection.delete_one({"_id": ObjectId(cat_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Category not found")

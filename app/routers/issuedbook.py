@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException,Depends,Query
 from bson import ObjectId
 from bson.errors import InvalidId
 from app.models import IssuedBook, IssuedBookResponse,UserRole,IssuedBookUpdate
-from app.database.db import issued_collection, book_collection
+from app.database.db import get_db
 from app.routers.user import require_roles
 from datetime import datetime,timedelta
 
@@ -12,17 +12,18 @@ router = APIRouter(prefix="/issued", tags=["IssuedBooks"])
 def issued_book_helper(doc) -> IssuedBookResponse:
     return IssuedBookResponse(
         id=str(doc["_id"]),
-        book_id=doc["book_id"],
-        student_id=doc["student_id"],
-        issued_date=doc["issued_date"],
-        return_date=doc["return_date"],
+        book_id=str(doc["book_id"]),
+        student_id=str(doc["student_id"]),
+        issued_date=str(doc["issued_date"]),
+        return_date=str(doc["return_date"]),
         is_returned=doc["is_returned"]
     )
-
 # Create
 
 @router.post("/", response_model=IssuedBookResponse, dependencies=[Depends(require_roles(UserRole.librarian))])
-async def issue_book(issue_data: IssuedBook):
+async def issue_book(issue_data: IssuedBook, db=Depends(get_db)):
+    issued_collection = db["issued_collection"]
+    book_collection = db["book_collection"]
     issue_dict = issue_data.dict()
     issue_dict["issued_date"] = datetime.now()
     # Validate book_id
@@ -56,7 +57,10 @@ async def issue_book(issue_data: IssuedBook):
 
 # Get All
 @router.get("/", response_model=list[IssuedBookResponse], dependencies=[Depends(require_roles(UserRole.librarian))])
-async def get_all_issued_books(page: int = Query(1, ge=1),size: int = Query(10, ge=1, le=100)):
+async def get_all_issued_books(page: int = Query(1, ge=1),size: int = Query(10, ge=1, le=100), db=Depends(get_db)):
+    issued_collection = db["issued_collection"]
+    issued_book_collection = db["book_collection"]
+    # Validate page and size
     skip = (page - 1) * size
     limit = size
     books = []
@@ -66,7 +70,8 @@ async def get_all_issued_books(page: int = Query(1, ge=1),size: int = Query(10, 
 
 # Get One
 @router.get("/{issued_id}", response_model=IssuedBookResponse, dependencies=[Depends(require_roles(UserRole.librarian))])
-async def get_issued_book(issued_id: str):
+async def get_issued_book(issued_id: str, db=Depends(get_db)):
+    issued_collection = db["issued_collection"]
     try:
         obj_id = ObjectId(issued_id)
     except InvalidId:
@@ -79,7 +84,9 @@ async def get_issued_book(issued_id: str):
 
 #update
 @router.put("/{issued_id}", response_model=IssuedBookResponse, dependencies=[Depends(require_roles(UserRole.librarian))])
-async def update_issued_book(issued_id: str, update_data: IssuedBookUpdate):
+async def update_issued_book(issued_id: str, update_data: IssuedBookUpdate, db=Depends(get_db)):
+    issued_collection = db["issued_collection"]
+    book_collection = db["book_collection"]
     try:
         obj_id = ObjectId(issued_id)
     except InvalidId:
@@ -116,7 +123,8 @@ async def update_issued_book(issued_id: str, update_data: IssuedBookUpdate):
 
 # Delete
 @router.delete("/{issued_id}", dependencies=[Depends(require_roles(UserRole.librarian))])
-async def delete_issued_book(issued_id: str):
+async def delete_issued_book(issued_id: str, db=Depends(get_db)):
+    issued_collection = db["issued_collection"]
     try:
         obj_id = ObjectId(issued_id)
     except InvalidId:
