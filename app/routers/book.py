@@ -1,10 +1,12 @@
-from fastapi import APIRouter, HTTPException,Depends,Query
-from app.models import BookCreate,BookResponse,UserRole,BookUpdate
-from bson import ObjectId, errors as bson_errors
+from bson import ObjectId
+from bson import errors as bson_errors
+from fastapi import APIRouter, Depends, HTTPException, Query
+
 from app.database.db import get_db
+from app.models import BookCreate, BookResponse, BookUpdate, UserRole
 from app.routers.user import require_roles
 
-router = APIRouter(prefix="/books",tags=['books'])
+router = APIRouter(prefix="/books", tags=["books"])
 
 
 def parse_mongo_document(doc: dict) -> dict:
@@ -13,7 +15,11 @@ def parse_mongo_document(doc: dict) -> dict:
     return doc
 
 
-@router.post("/", response_model=BookResponse, dependencies=[Depends(require_roles(UserRole.librarian))])
+@router.post(
+    "/",
+    response_model=BookResponse,
+    dependencies=[Depends(require_roles(UserRole.librarian))],
+)
 async def create_book(book: BookCreate, db=Depends(get_db)):
     book_collection = db["book_collection"]
     book_dict = book.dict()
@@ -22,8 +28,14 @@ async def create_book(book: BookCreate, db=Depends(get_db)):
     return BookResponse(**parse_mongo_document(created))
 
 
-@router.get("/", response_model=list[BookResponse], dependencies=[Depends(require_roles(UserRole.librarian))])
-async def get_books(page: int = Query(1, ge=1),size: int = Query(10, ge=1, le=100), db=Depends(get_db)):
+@router.get(
+    "/",
+    response_model=list[BookResponse],
+    dependencies=[Depends(require_roles(UserRole.librarian))],
+)
+async def get_books(
+    page: int = Query(1, ge=1), size: int = Query(10, ge=1, le=100), db=Depends(get_db)
+):
     book_collection = db["book_collection"]
     skip = (page - 1) * size
     limit = size
@@ -33,7 +45,11 @@ async def get_books(page: int = Query(1, ge=1),size: int = Query(10, ge=1, le=10
     return books
 
 
-@router.get("/{book_id}", response_model=BookResponse, dependencies=[Depends(require_roles(UserRole.librarian))])
+@router.get(
+    "/{book_id}",
+    response_model=BookResponse,
+    dependencies=[Depends(require_roles(UserRole.librarian))],
+)
 async def get_book(book_id: str, db=Depends(get_db)):
     book_collection = db["book_collection"]
     book = await book_collection.find_one({"_id": ObjectId(book_id)})
@@ -42,13 +58,16 @@ async def get_book(book_id: str, db=Depends(get_db)):
     return BookResponse(**parse_mongo_document(book))
 
 
-@router.put("/{book_id}", response_model=BookResponse, dependencies=[Depends(require_roles(UserRole.librarian))])
+@router.put(
+    "/{book_id}",
+    response_model=BookResponse,
+    dependencies=[Depends(require_roles(UserRole.librarian))],
+)
 async def update_book(book_id: str, book_data: BookUpdate, db=Depends(get_db)):
     book_collection = db["book_collection"]
     update = book_data.dict()
     result = await book_collection.update_one(
-        {"_id": ObjectId(book_id)},
-        {"$set": update}
+        {"_id": ObjectId(book_id)}, {"$set": update}
     )
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Book not updated")
@@ -62,7 +81,7 @@ async def delete_book(book_id: str, db=Depends(get_db)):
         book_id = ObjectId(book_id)
     except bson_errors.InvalidId:
         raise HTTPException(status_code=400, detail="Invalid book ID")
-    
+
     book_collection = db["book_collection"]
     result = await book_collection.delete_one({"_id": ObjectId(book_id)})
     if result.deleted_count == 0:

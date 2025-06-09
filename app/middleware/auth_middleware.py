@@ -3,7 +3,7 @@
 # from fastapi.responses import JSONResponse
 # import jwt
 
-# SECRET_KEY = "3GvZhLwZyMJl4zS9B8tRhrGfF9LxkIArEWTCLXrwMnc" 
+# SECRET_KEY = "3GvZhLwZyMJl4zS9B8tRhrGfF9LxkIArEWTCLXrwMnc"
 
 # async def jwt_middleware(request: Request, call_next):
 #     if request.url.path.startswith("/public"):
@@ -26,5 +26,3 @@
 #         return JSONResponse(status_code=401, content={"detail": "Invalid token"})
 
 #     return await call_next(request)
-
-

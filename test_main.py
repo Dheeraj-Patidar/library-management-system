@@ -1,22 +1,27 @@
-import pytest
-from httpx import AsyncClient, ASGITransport
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
+
+import pytest
 from bson import ObjectId
-from app.main import app
-from datetime import datetime, timezone, timedelta
+from httpx import ASGITransport, AsyncClient
+
 from app.database.db import get_db
+from app.main import app
 from app.models import User, UserRole
 from app.routers.user import get_current_user  # or wherever it's defined
+
 now = datetime.now(tz=timezone.utc)
-from app.auth import hash_password
-from app.auth import create_access_token
 import uuid
+from unittest.mock import AsyncMock
+
 # Fixtures for Mocking Database Collections and Dependencies..................................................................
 import pytest
-from unittest.mock import AsyncMock
 from bson import ObjectId
 
+from app.auth import create_access_token, hash_password
+
 # Shared memory store
+
 
 @pytest.fixture
 def mock_user_collection():
@@ -59,31 +64,39 @@ def mock_user_collection():
     return mock
 
 
+# Custom async iterator to simulate async database cursor
+# This is a workaround since AsyncMock does not support async iterators directly
+
+
+class AsyncIterator:
+    def __init__(self, items):
+        self._items = items
+        self._index = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self._index >= len(self._items):
+            raise StopAsyncIteration
+        item = self._items[self._index]
+        self._index += 1
+        return item
+
 
 @pytest.fixture
 def mock_student_fine_collection():
     fines_store = []
 
-    class AsyncIterator:
-        def __init__(self, items):
-            self._items = items
-            self._index = 0
-
-        def __aiter__(self):
-            return self
-
-        async def __anext__(self):
-            if self._index >= len(self._items):
-                raise StopAsyncIteration
-            item = self._items[self._index]
-            self._index += 1
-            return item
-
     async def find(query={}):
         student_id_query = query.get("student_id")
         if isinstance(student_id_query, ObjectId):
             student_id_query = str(student_id_query)
-        results = [fine for fine in fines_store if fine.get("student_id") == student_id_query or query == {}]
+        results = [
+            fine
+            for fine in fines_store
+            if fine.get("student_id") == student_id_query or query == {}
+        ]
         return AsyncIterator(results)
 
     async def insert_one(fine):
@@ -104,44 +117,24 @@ def mock_student_fine_collection():
     return mock
 
 
-
-
 @pytest.fixture
 def mock_author_collection():
     mock = AsyncMock()
     mock.insert_one.return_value.inserted_id = ObjectId("507f1f77bcf86cd799439011")
-    mock.find_one = AsyncMock(return_value={
-        "_id": ObjectId("507f1f77bcf86cd799439011"),
-        "author_name": "Test Author",
-        "created_at": now.isoformat(),
-        "updated_at": now.isoformat()
-    })
+    mock.find_one = AsyncMock(
+        return_value={
+            "_id": ObjectId("507f1f77bcf86cd799439011"),
+            "author_name": "Test Author",
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        }
+    )
     return mock
-
-# Custom async iterator to simulate async database cursor
-# This is a workaround since AsyncMock does not support async iterators directly
-class AsyncIterator:
-    def __init__(self, items):
-        self._items = items
-        self._index = 0
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        if self._index >= len(self._items):
-            raise StopAsyncIteration
-        item = self._items[self._index]
-        self._index += 1
-        return item
-
-
 
 
 @pytest.fixture
 def mock_book_collection():
     mock = AsyncMock()
-    
 
     mock.insert_one.return_value.inserted_id = ObjectId("60d5ec49f8d2e86f1f3f83b1")
     mock.find_one.return_value = {
@@ -149,44 +142,32 @@ def mock_book_collection():
         "book_name": "Test Book",
         "author_id": "507f1f77bcf86cd799439011",
         "category_id": "60d5ec49f8d2e86f1f3f83b1",
-        "is_available": True
+        "is_available": True,
     }
-    # Mocking find to return an async iterator
-    class AsyncIterator:
-        def __init__(self, items):
-            self._items = items
-            self._index = 0
 
-        def __aiter__(self):
-            return self
-
-        async def __anext__(self):
-            if self._index >= len(self._items):
-                raise StopAsyncIteration
-            item = self._items[self._index]
-            self._index += 1
-            return item
-    mock.find = lambda *args, **kwargs: AsyncIterator([
-        {
+    mock.find = lambda *args, **kwargs: AsyncIterator(
+        [
+            {
+                "_id": ObjectId("60d5ec49f8d2e86f1f3f83b1"),
+                "book_name": "Test Book",
+                "author_id": "507f1f77bcf86cd799439011",
+                "category_id": "60d5ec49f8d2e86f1f3f83b1",
+                "is_available": True,
+            }
+        ]
+    )
+    # Mocking find to return a single book document
+    mock.find_one = AsyncMock(
+        return_value={
             "_id": ObjectId("60d5ec49f8d2e86f1f3f83b1"),
             "book_name": "Test Book",
             "author_id": "507f1f77bcf86cd799439011",
             "category_id": "60d5ec49f8d2e86f1f3f83b1",
-            "is_available": True
+            "is_available": True,
         }
-    ])
-    # Mocking find to return a single book document
-    mock.find_one = AsyncMock(return_value={
-        "_id": ObjectId("60d5ec49f8d2e86f1f3f83b1"),
-        "book_name": "Test Book",
-        "author_id": "507f1f77bcf86cd799439011",
-        "category_id": "60d5ec49f8d2e86f1f3f83b1",
-        "is_available": True
-    })
-    
+    )
+
     return mock
-
-
 
 
 @pytest.fixture
@@ -195,11 +176,16 @@ def mock_category_collection():
     mock.insert_one.return_value.inserted_id = ObjectId("60d5ec49f8d2e86f1f3f83b1")
     mock.find_one.return_value = {
         "_id": ObjectId("60d5ec49f8d2e86f1f3f83b1"),
-        "category_name": "Test Category"
+        "category_name": "Test Category",
     }
-    mock.find = lambda *args, **kwargs: AsyncIterator([
-        {"_id": ObjectId("60d5ec49f8d2e86f1f3f83b1"), "category_name": "Test Category"}
-    ])
+    mock.find = lambda *args, **kwargs: AsyncIterator(
+        [
+            {
+                "_id": ObjectId("60d5ec49f8d2e86f1f3f83b1"),
+                "category_name": "Test Category",
+            }
+        ]
+    )
     return mock
 
 
@@ -207,45 +193,30 @@ def mock_category_collection():
 def mock_student_collection():
     mock = AsyncMock()
     fake_id = ObjectId("507f1f77bcf86cd799439012")
-    
+
     mock.insert_one.return_value.inserted_id = fake_id
-    mock.find_one = AsyncMock(return_value={
-        "_id": fake_id,
-        "student_name": "Test Student",
-        "email": "test@student.com"
-    })
-    
+    mock.find_one = AsyncMock(
+        return_value={
+            "_id": fake_id,
+            "student_name": "Test Student",
+            "email": "test@student.com",
+        }
+    )
+
     # For update_one
     mock.update_one.return_value.modified_count = 1
-    
+
     # For delete_one
     mock.delete_one.return_value.deleted_count = 1
 
     # For find returning multiple student - will use AsyncIterator pattern in mock_db fixture
-    
-    return mock
 
+    return mock
 
 
 @pytest.fixture
 def mock_issued_collection():
     mock = AsyncMock()
-    
-    # Async iterator for issued_collection.find
-    class AsyncIterator:
-        def __init__(self, items):
-            self._items = items
-            self._index = 0
-
-        def __aiter__(self):
-            return self
-
-        async def __anext__(self):
-            if self._index >= len(self._items):
-                raise StopAsyncIteration
-            item = self._items[self._index]
-            self._index += 1
-            return item
 
     # Sample issued book document
     issued_book = {
@@ -254,24 +225,30 @@ def mock_issued_collection():
         "student_id": "507f1f77bcf86cd799439012",
         "issued_date": "2024-01-01",
         "return_date": "2024-02-01",
-        "is_returned": False
+        "is_returned": False,
     }
 
     mock.find = lambda *args, **kwargs: AsyncIterator([issued_book])
 
     # Mock insert_one to return a mock result with inserted_id
     mock.insert_one.return_value.inserted_id = issued_book["_id"]
-    
+
     # Mock find_one to return the issued_book dict directly (no MagicMocks)
     mock.find_one.return_value = issued_book
 
     return mock
 
 
-
-
 @pytest.fixture
-def mock_db(mock_author_collection,mock_book_collection,mock_category_collection,mock_student_collection,mock_issued_collection,mock_user_collection,mock_student_fine_collection):
+def mock_db(
+    mock_author_collection,
+    mock_book_collection,
+    mock_category_collection,
+    mock_student_collection,
+    mock_issued_collection,
+    mock_user_collection,
+    mock_student_fine_collection,
+):
     return {
         "author_collection": mock_author_collection,
         "book_collection": mock_book_collection,
@@ -279,15 +256,15 @@ def mock_db(mock_author_collection,mock_book_collection,mock_category_collection
         "student_collection": mock_student_collection,
         "issued_collection": mock_issued_collection,
         "user_collection": mock_user_collection,
-        "student_fine_collection": mock_student_fine_collection
+        "student_fine_collection": mock_student_fine_collection,
     }
-
 
 
 @pytest.fixture(autouse=True)
 async def override_get_db(mock_db):
     async def _override():
         yield mock_db
+
     app.dependency_overrides[get_db] = _override
     yield
     app.dependency_overrides.clear()
@@ -300,20 +277,12 @@ async def async_client(override_get_db):
         yield client
 
 
-
-
-
-
 # Tests for User Endpoints.........................................................................................
 
 
 @pytest.fixture
 def admin_token():
-    return create_access_token({
-        "sub": "admin@example.com",
-        "role": "admin"
-    })
-
+    return create_access_token({"sub": "admin@example.com", "role": "admin"})
 
 
 @pytest.mark.asyncio
@@ -323,12 +292,11 @@ async def test_register(async_client):
         "username": f"testuser_{unique_id}",
         "email": f"user_{unique_id}@example.com",
         "password": "password123",
-        "role": "student"
+        "role": "student",
     }
 
     reg_response = await async_client.post("/users/", json=user_data)
     assert reg_response.status_code == 200
-
 
 
 @pytest.mark.asyncio
@@ -342,11 +310,11 @@ async def test_register_user_already_exists(async_client, mock_user_collection):
         "username": "existinguser",
         "email": email,
         "password": "password123",
-        "role": "student"
+        "role": "student",
     }
 
     response1 = await async_client.post("/users/", json=user_data)
-    
+
     assert response1.status_code == 200
 
     response2 = await async_client.post("/users/", json=user_data)
@@ -354,48 +322,51 @@ async def test_register_user_already_exists(async_client, mock_user_collection):
     assert response2.json()["detail"] == "Email Already Exist"
 
 
-
 @pytest.mark.asyncio
 async def test_login_user(async_client):
     unique_id = uuid.uuid4().hex[:8]
     email = f"user_{unique_id}@example.com"
     password = "password123"
-    
-    reg = await async_client.post("/users/", json={
-        "username": f"user_{unique_id}",
-        "email": email,
-        "password": password,
-        "role": "student"
-    })
+
+    reg = await async_client.post(
+        "/users/",
+        json={
+            "username": f"user_{unique_id}",
+            "email": email,
+            "password": password,
+            "role": "student",
+        },
+    )
 
     assert reg.status_code == 200
 
-    login_response = await async_client.post("/users/token", data={
-        "username": email,
-        "password": password
-    })
+    login_response = await async_client.post(
+        "/users/token", data={"username": email, "password": password}
+    )
     assert login_response.status_code == 200
-
-
 
 
 @pytest.mark.asyncio
 async def test_get_user_by_id(async_client, admin_token):
     # Create user
-    create_response = await async_client.post("/users/", json={
-        "username": "admin2",
-        "email": "admin2@example.com",
-        "password": "adminpass",
-        "role": "admin"
-    }, headers={"Authorization": f"Bearer {admin_token}"})
+    create_response = await async_client.post(
+        "/users/",
+        json={
+            "username": "admin2",
+            "email": "admin2@example.com",
+            "password": "adminpass",
+            "role": "admin",
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
 
     assert create_response.status_code == 200
     user_id = create_response.json()["id"]
 
     # Retrieve user
-    response = await async_client.get(f"/users/{user_id}", headers={
-        "Authorization": f"Bearer {admin_token}"
-    })
+    response = await async_client.get(
+        f"/users/{user_id}", headers={"Authorization": f"Bearer {admin_token}"}
+    )
 
     if response.status_code != 200:
         print("RESPONSE TEXT:", response.text)
@@ -404,28 +375,35 @@ async def test_get_user_by_id(async_client, admin_token):
     assert response.json()["email"] == "admin2@example.com"
 
 
-
 @pytest.mark.asyncio
 async def test_update_user(async_client, admin_token):
     # Create user first
-    create_response = await async_client.post("/users/", json={
-        "username": "admin2",
-        "email": "updated@example.com",
-        "password": "initialpass",
-        "role": "student"
-    }, headers={"Authorization": f"Bearer {admin_token}"})
-    
+    create_response = await async_client.post(
+        "/users/",
+        json={
+            "username": "admin2",
+            "email": "updated@example.com",
+            "password": "initialpass",
+            "role": "student",
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
     assert create_response.status_code == 200
     user_id = create_response.json()["id"]
 
     # Now update the user
-    response = await async_client.put(f"/users/{user_id}", json={
-        "username": "updatedadmin2",
-        "email": "updated@example.com",
-        "password": "newpassword123",
-        "role": "student"
-    }, headers={"Authorization": f"Bearer {admin_token}"})
-    
+    response = await async_client.put(
+        f"/users/{user_id}",
+        json={
+            "username": "updatedadmin2",
+            "email": "updated@example.com",
+            "password": "newpassword123",
+            "role": "student",
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
     assert response.status_code == 200
     assert response.json()["email"] == "updated@example.com"
 
@@ -439,7 +417,7 @@ async def test_update_user(async_client, admin_token):
 #         "password": "user123",
 #         "role": "student"
 #     }, headers={"Authorization": f"Bearer {admin_token}"})
-    
+
 #     assert create_response.status_code == 200
 #     user_id = create_response.json()["id"]
 #     print("Created User ID:", user_id)
@@ -456,7 +434,7 @@ async def test_update_user(async_client, admin_token):
 #     print("DELETE RESPONSE:", response.status_code, response.text)
 #     assert response.status_code == 200
 #     assert response.json()["detail"] == "User deleted successfully"
-    
+
 
 # @pytest.mark.asyncio
 # async def test_get_user_fines(async_client, admin_token, mock_student_fine_collection):
@@ -489,18 +467,8 @@ async def test_update_user(async_client, admin_token):
 #     assert response.status_code == 200
 #     fines = response.json()
 #     assert isinstance(fines, list)
-#     assert fines 
-#     assert fines[0]["fine_amount"] == 100.0 
-
-
-
-
-
-
-
-
-
-
+#     assert fines
+#     assert fines[0]["fine_amount"] == 100.0
 
 
 # Tests for CreateAuthor Endpoints.........................................................................................
@@ -525,25 +493,23 @@ async def test_get_author(async_client):
     assert "books" in json_resp
 
 
-
-
 # Tests for Update Authors Endpoints......................................................................................
 @pytest.mark.asyncio
 async def test_update_author_success(async_client, mock_author_collection):
     author_id = "507f1f77bcf86cd799439011"
     payload = {"author_name": "Updated Author"}
-    
+
     # Mock update_one to return modified_count = 1 (successful update)
     mock_author_collection.update_one.return_value.modified_count = 1
-    
+
     # Mock find_one to return updated author document
     mock_author_collection.find_one.return_value = {
         "_id": ObjectId(author_id),
         "author_name": "Updated Author",
         "created_at": now.isoformat(),
-        "updated_at": datetime.now(tz=timezone.utc).isoformat()
+        "updated_at": datetime.now(tz=timezone.utc).isoformat(),
     }
-    
+
     response = await async_client.put(f"/author/{author_id}", json=payload)
     assert response.status_code == 200
     json_resp = response.json()
@@ -556,10 +522,10 @@ async def test_update_author_success(async_client, mock_author_collection):
 async def test_update_author_not_found(async_client, mock_author_collection):
     author_id = "507f1f77bcf86cd799439011"
     payload = {"author_name": "Updated Author"}
-    
+
     # Mock update_one to return modified_count = 0 (no update)
     mock_author_collection.update_one.return_value.modified_count = 0
-    
+
     response = await async_client.put(f"/author/{author_id}", json=payload)
     assert response.status_code == 404
     assert response.json() == {"detail": "Author not updated"}
@@ -569,36 +535,29 @@ async def test_update_author_not_found(async_client, mock_author_collection):
 @pytest.mark.asyncio
 async def test_delete_author_success(async_client, mock_author_collection):
     author_id = "507f1f77bcf86cd799439011"
-    
+
     # Mock delete_one to simulate successful deletion
     mock_author_collection.delete_one.return_value.deleted_count = 1
-    
+
     response = await async_client.delete(f"/author/{author_id}")
     assert response.status_code == 200
     assert response.json() == {"message": "Author deleted"}
+
 
 # Tests for Delete Author Not Found Endpoints......................................................................................
 @pytest.mark.asyncio
 async def test_delete_author_not_found(async_client, mock_author_collection):
     author_id = "507f1f77bcf86cd799439011"
-    
+
     # Mock delete_one to simulate author not found
     mock_author_collection.delete_one.return_value.deleted_count = 0
-    
+
     response = await async_client.delete(f"/author/{author_id}")
     assert response.status_code == 404
     assert response.json() == {"detail": "Author not found"}
 
 
-
-
-
-
-
-
-
 # tests for  Category Endpoints......................................................................................................................
-
 
 
 @pytest.mark.asyncio
@@ -620,12 +579,14 @@ async def test_get_category_by_id(async_client):
     assert data["id"] == category_id
     assert data["category_name"] == "Test Category"
 
+
 @pytest.mark.asyncio
 async def test_get_category_not_found(async_client, mock_category_collection):
     mock_category_collection.find_one.return_value = None
     response = await async_client.get("/category/000000000000000000000000")
     assert response.status_code == 404
     assert response.json()["detail"] == "Category not found"
+
 
 @pytest.mark.asyncio
 async def test_update_category_success(async_client, mock_category_collection):
@@ -635,13 +596,14 @@ async def test_update_category_success(async_client, mock_category_collection):
     mock_category_collection.update_one.return_value.modified_count = 1
     mock_category_collection.find_one.return_value = {
         "_id": ObjectId(category_id),
-        "category_name": "Updated Category"
+        "category_name": "Updated Category",
     }
 
     response = await async_client.put(f"/category/{category_id}", json=payload)
     assert response.status_code == 200
     data = response.json()
     assert data["category_name"] == "Updated Category"
+
 
 @pytest.mark.asyncio
 async def test_update_category_not_found(async_client, mock_category_collection):
@@ -654,6 +616,7 @@ async def test_update_category_not_found(async_client, mock_category_collection)
     assert response.status_code == 404
     assert response.json()["detail"] == "Category not updated"
 
+
 @pytest.mark.asyncio
 async def test_delete_category_success(async_client, mock_category_collection):
     category_id = "60d5ec49f8d2e86f1f3f83b1"
@@ -662,6 +625,7 @@ async def test_delete_category_success(async_client, mock_category_collection):
     response = await async_client.delete(f"/category/{category_id}")
     assert response.status_code == 200
     assert response.json() == {"message": "Category deleted"}
+
 
 @pytest.mark.asyncio
 async def test_delete_category_not_found(async_client, mock_category_collection):
@@ -673,20 +637,12 @@ async def test_delete_category_not_found(async_client, mock_category_collection)
     assert response.json()["detail"] == "Category not found"
 
 
-
-
-
 # tests for Student Endpoints......................................................................................................................
-
-
 
 
 @pytest.mark.asyncio
 async def test_create_student(async_client, mock_student_collection):
-    payload = {
-        "student_name": "Test Student",
-        "email": "test@student.com"
-    }
+    payload = {"student_name": "Test Student", "email": "test@student.com"}
 
     response = await async_client.post("/students/", json=payload)
     assert response.status_code == 200
@@ -697,7 +653,9 @@ async def test_create_student(async_client, mock_student_collection):
 
 
 @pytest.mark.asyncio
-async def test_get_student_with_issued_books(async_client, mock_student_collection, mock_issued_collection):
+async def test_get_student_with_issued_books(
+    async_client, mock_student_collection, mock_issued_collection
+):
     student_id = "507f1f77bcf86cd799439012"
 
     response = await async_client.get(f"/students/{student_id}")
@@ -720,17 +678,14 @@ async def test_get_student_with_invalid_id(async_client):
 @pytest.mark.asyncio
 async def test_update_student_success(async_client, mock_student_collection):
     student_id = "507f1f77bcf86cd799439012"
-    payload = {
-        "student_name": "Updated Student",
-        "email": "updated@student.com"
-    }
+    payload = {"student_name": "Updated Student", "email": "updated@student.com"}
 
     mock_student_collection = mock_student_collection
     mock_student_collection.update_one.return_value.modified_count = 1
     mock_student_collection.find_one.return_value = {
         "_id": ObjectId(student_id),
         "student_name": payload["student_name"],
-        "email": payload["email"]
+        "email": payload["email"],
     }
 
     response = await async_client.put(f"/students/{student_id}", json=payload)
@@ -743,10 +698,7 @@ async def test_update_student_success(async_client, mock_student_collection):
 @pytest.mark.asyncio
 async def test_update_student_not_updated(async_client, mock_student_collection):
     student_id = "507f1f77bcf86cd799439012"
-    payload = {
-        "student_name": "Updated Student",
-        "email": "updated@student.com"
-    }
+    payload = {"student_name": "Updated Student", "email": "updated@student.com"}
 
     mock_student_collection.update_one.return_value.modified_count = 0
 
@@ -786,10 +738,6 @@ async def test_delete_student_invalid_id(async_client):
     assert response.json()["detail"] == "Invalid student ID"
 
 
-
-
-
-
 # Tests for Book Endpoints......................................................................................................................
 
 
@@ -797,17 +745,14 @@ async def test_delete_student_invalid_id(async_client):
 async def librarian_token(async_client):
     user_data = {
         "username": "librarian@example.com",
-        "email": "librarian@example.com",     
+        "email": "librarian@example.com",
         "password": "password123",
-        "role": "librarian"
+        "role": "librarian",
     }
 
     # Register the user
     reg_response = await async_client.post("/users/", json=user_data)
-    login_data = {
-        "username": "librarian@example.com",
-        "password": "password123"
-    }
+    login_data = {"username": "librarian@example.com", "password": "password123"}
 
     login_response = await async_client.post("/users/token", data=login_data)
     assert login_response.status_code == 200, f"Login failed: {login_response.text}"
@@ -819,20 +764,20 @@ sample_book_create = {
     "book_name": "Test Book",
     "author_id": "507f1f77bcf86cd799439011",
     "category_id": "60d5ec49f8d2e86f1f3f83b1",
-    "is_available": True
+    "is_available": True,
 }
 
-sample_book_update = {
-    "is_available": False
-}
+sample_book_update = {"is_available": False}
 
 
 @pytest.mark.asyncio
-async def test_create_book(async_client, mock_db,librarian_token):
-    response = await async_client.post("/books/", json=sample_book_create, headers={
-        "Authorization": f"Bearer {librarian_token}"
-    })
-    print(response.status_code, response.text)
+async def test_create_book(async_client, mock_db, librarian_token):
+    response = await async_client.post(
+        "/books/",
+        json=sample_book_create,
+        headers={"Authorization": f"Bearer {librarian_token}"},
+    )
+
     assert response.status_code == 200
     data = response.json()
     assert "id" in data
@@ -840,7 +785,6 @@ async def test_create_book(async_client, mock_db,librarian_token):
     assert data["author_id"] == sample_book_create["author_id"]
     assert data["category_id"] == sample_book_create["category_id"]
     assert data["is_available"] is True
-
 
 
 # @pytest.mark.asyncio
@@ -866,33 +810,31 @@ async def test_create_book(async_client, mock_db,librarian_token):
 #     assert data[0]["book_name"] == "Test Book"
 
 
-
-
 @pytest.mark.asyncio
-async def test_get_book_by_id(async_client, mock_book_collection,librarian_token):
+async def test_get_book_by_id(async_client, mock_book_collection, librarian_token):
     book_id = "60d5ec49f8d2e86f1f3f83b1"
-    response = await async_client.get(f"/books/{book_id}", headers={
-        "Authorization": f"Bearer {librarian_token}"
-    })  
+    response = await async_client.get(
+        f"/books/{book_id}", headers={"Authorization": f"Bearer {librarian_token}"}
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == book_id
-    assert data["book_name"] == "Test Book" 
-
+    assert data["book_name"] == "Test Book"
 
 
 @pytest.mark.asyncio
-async def test_get_book_not_found(async_client, mock_book_collection,librarian_token):
+async def test_get_book_not_found(async_client, mock_book_collection, librarian_token):
     mock_book_collection.find_one.return_value = None
     book_id = "60d5ec49f8d2e86f1f3f83b1"
-    response = await async_client.get(f"/books/{book_id}", headers={ "Authorization": f"Bearer {librarian_token}" })
+    response = await async_client.get(
+        f"/books/{book_id}", headers={"Authorization": f"Bearer {librarian_token}"}
+    )
     assert response.status_code == 404
     assert response.json()["detail"] == "Book not found"
 
 
-
 @pytest.mark.asyncio
-async def test_update_book_success(async_client, mock_book_collection,librarian_token):     
+async def test_update_book_success(async_client, mock_book_collection, librarian_token):
     book_id = "60d5ec49f8d2e86f1f3f83b1"
     payload = sample_book_update
 
@@ -902,89 +844,99 @@ async def test_update_book_success(async_client, mock_book_collection,librarian_
         "book_name": "Test Book",
         "author_id": "507f1f77bcf86cd799439011",
         "category_id": "60d5ec49f8d2e86f1f3f83b1",
-        "is_available": False
+        "is_available": False,
     }
 
-    response = await async_client.put(f"/books/{book_id}", json=payload, headers={
-        "Authorization": f"Bearer {librarian_token}"
-    })
+    response = await async_client.put(
+        f"/books/{book_id}",
+        json=payload,
+        headers={"Authorization": f"Bearer {librarian_token}"},
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["is_available"] is False
 
+
 @pytest.mark.asyncio
-async def test_update_book_not_found(async_client, mock_book_collection,librarian_token):
+async def test_update_book_not_found(
+    async_client, mock_book_collection, librarian_token
+):
     book_id = "60d5ec49f8d2e86f1f3f83b1"
     payload = sample_book_update
 
     mock_book_collection.update_one.return_value.modified_count = 0
 
-    response = await async_client.put(f"/books/{book_id}", json=payload, headers={
-        "Authorization": f"Bearer {librarian_token}"
-    })
+    response = await async_client.put(
+        f"/books/{book_id}",
+        json=payload,
+        headers={"Authorization": f"Bearer {librarian_token}"},
+    )
     assert response.status_code == 404
-    assert response.json()["detail"] == "Book not updated"  
-
+    assert response.json()["detail"] == "Book not updated"
 
 
 @pytest.mark.asyncio
-async def test_delete_book_success(async_client, mock_book_collection,librarian_token):
+async def test_delete_book_success(async_client, mock_book_collection, librarian_token):
     book_id = "60d5ec49f8d2e86f1f3f83b1"
 
     mock_book_collection.delete_one.return_value.deleted_count = 1
 
-    response = await async_client.delete(f"/books/{book_id}", headers={
-        "Authorization": f"Bearer {librarian_token}"
-    })
+    response = await async_client.delete(
+        f"/books/{book_id}", headers={"Authorization": f"Bearer {librarian_token}"}
+    )
     assert response.status_code == 200
-    assert response.json()["message"] == "Book deleted" 
-
+    assert response.json()["message"] == "Book deleted"
 
 
 @pytest.mark.asyncio
-async def test_delete_book_not_found(async_client, mock_book_collection,librarian_token):
+async def test_delete_book_not_found(
+    async_client, mock_book_collection, librarian_token
+):
     book_id = "60d5ec49f8d2e86f1f3f83b1"
 
     mock_book_collection.delete_one.return_value.deleted_count = 0
 
-    response = await async_client.delete(f"/books/{book_id}", headers={
-        "Authorization": f"Bearer {librarian_token}"
-    })
+    response = await async_client.delete(
+        f"/books/{book_id}", headers={"Authorization": f"Bearer {librarian_token}"}
+    )
     assert response.status_code == 404
     assert response.json()["detail"] == "Book not found"
 
 
-
 @pytest.mark.asyncio
-async def test_delete_book_invalid_id(async_client, mock_book_collection,librarian_token):
+async def test_delete_book_invalid_id(
+    async_client, mock_book_collection, librarian_token
+):
     invalid_id = "invalidid"
 
-    response = await async_client.delete(f"/books/{invalid_id}", headers={"Authorization": f"Bearer {librarian_token}"})
+    response = await async_client.delete(
+        f"/books/{invalid_id}", headers={"Authorization": f"Bearer {librarian_token}"}
+    )
     assert response.status_code == 400
-    assert response.json()["detail"] == "Invalid book ID"  
+    assert response.json()["detail"] == "Invalid book ID"
 
 
 # Tests for Issued Book Endpoints......................................................................................................................
 
+
 @pytest.mark.asyncio
-async def test_issue_book(async_client, mock_db,librarian_token):
+async def test_issue_book(async_client, mock_db, librarian_token):
     payload = {
         "book_id": "60d5ec49f8d2e86f1f3f83b1",
         "student_id": "507f1f77bcf86cd799439012",
         "issued_date": "2024-01-01",
         "return_date": "2024-02-01",
-        "is_returned": False
+        "is_returned": False,
     }
 
-    response = await async_client.post("/issued/", json=payload, headers={
-        "Authorization": f"Bearer {librarian_token}"
-    })
+    response = await async_client.post(
+        "/issued/", json=payload, headers={"Authorization": f"Bearer {librarian_token}"}
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["book_id"] == payload["book_id"]
     assert data["student_id"] == payload["student_id"]
     assert data["is_returned"] is False
-
 
 
 # @pytest.mark.asyncio
@@ -1001,7 +953,7 @@ async def test_issue_book(async_client, mock_db,librarian_token):
 #         }
 #     ]))
 #     response = await async_client.get("/issued/", headers={
-#         "Authorization": f"Bearer {librarian_token}"    
+#         "Authorization": f"Bearer {librarian_token}"
 #     })
 #     assert response.status_code == 200
 #     data = response.json()
@@ -1011,35 +963,32 @@ async def test_issue_book(async_client, mock_db,librarian_token):
 
 
 @pytest.mark.asyncio
-async def test_get_issued_book_by_id(async_client, mock_db,librarian_token):
+async def test_get_issued_book_by_id(async_client, mock_db, librarian_token):
     issued_id = "507f191e810c19729de860ea"
-    response = await async_client.get(f"/issued/{issued_id}", headers={
-        "Authorization": f"Bearer {librarian_token}"
-    })  
+    response = await async_client.get(
+        f"/issued/{issued_id}", headers={"Authorization": f"Bearer {librarian_token}"}
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == issued_id
-    assert data["book_id"] == "60d5ec49f8d2e86f1f3f83b1"    
+    assert data["book_id"] == "60d5ec49f8d2e86f1f3f83b1"
 
 
 @pytest.mark.asyncio
-async def test_get_issued_book_not_found(async_client, mock_db,librarian_token):
+async def test_get_issued_book_not_found(async_client, mock_db, librarian_token):
     mock_db["issued_collection"].find_one.return_value = None
     issued_id = "507f191e810c19729de860ea"
-    response = await async_client.get(f"/issued/{issued_id}", headers={
-        "Authorization": f"Bearer {librarian_token}"
-    })  
+    response = await async_client.get(
+        f"/issued/{issued_id}", headers={"Authorization": f"Bearer {librarian_token}"}
+    )
     assert response.status_code == 404
     assert response.json()["detail"] == "Issued record not found"
 
 
-
 @pytest.mark.asyncio
-async def test_update_issued_book_success(async_client, mock_db,librarian_token):
+async def test_update_issued_book_success(async_client, mock_db, librarian_token):
     issued_id = "507f191e810c19729de860ea"
-    payload = {
-        "is_returned": True
-    }
+    payload = {"is_returned": True}
 
     mock_db["issued_collection"].update_one.return_value.modified_count = 1
     mock_db["issued_collection"].find_one.return_value = {
@@ -1048,61 +997,63 @@ async def test_update_issued_book_success(async_client, mock_db,librarian_token)
         "student_id": "507f1f77bcf86cd799439012",
         "issued_date": "2024-01-01",
         "return_date": "2024-02-01",
-        "is_returned": True
+        "is_returned": True,
     }
 
-    response = await async_client.put(f"/issued/{issued_id}", json=payload, headers={
-        "Authorization": f"Bearer {librarian_token}"
-    })
+    response = await async_client.put(
+        f"/issued/{issued_id}",
+        json=payload,
+        headers={"Authorization": f"Bearer {librarian_token}"},
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["is_returned"] is True
 
 
-
 @pytest.mark.asyncio
-async def test_update_issued_book_not_found(async_client, mock_db,librarian_token):
+async def test_update_issued_book_not_found(async_client, mock_db, librarian_token):
     issued_id = "507f191e810c19729de860ea"
-    payload = {
-        "is_returned": True
-    }   
+    payload = {"is_returned": True}
     mock_db["issued_collection"].update_one.return_value.modified_count = 0
-    response = await async_client.put(f"/issued/{issued_id}", json=payload, headers={
-        "Authorization": f"Bearer {librarian_token}"
-    })
+    response = await async_client.put(
+        f"/issued/{issued_id}",
+        json=payload,
+        headers={"Authorization": f"Bearer {librarian_token}"},
+    )
     assert response.status_code == 400
     assert response.json()["detail"] == "No changes made"
 
 
-
 @pytest.mark.asyncio
-async def test_delete_issued_book_success(async_client, mock_db,librarian_token):
-    issued_id = "507f191e810c19729de860ea" 
+async def test_delete_issued_book_success(async_client, mock_db, librarian_token):
+    issued_id = "507f191e810c19729de860ea"
     mock_db["issued_collection"].delete_one.return_value.deleted_count = 1
-    response = await async_client.delete(f"/issued/{issued_id}", headers={"Authorization": f"Bearer {librarian_token}"})
+    response = await async_client.delete(
+        f"/issued/{issued_id}", headers={"Authorization": f"Bearer {librarian_token}"}
+    )
     assert response.status_code == 200
     assert response.json()["message"] == "Issued record deleted"
 
 
-
 @pytest.mark.asyncio
-async def test_delete_issued_book_not_found(async_client, mock_db,librarian_token):
+async def test_delete_issued_book_not_found(async_client, mock_db, librarian_token):
     issued_id = "507f191e810c19729de860ea"
     mock_db["issued_collection"].delete_one.return_value.deleted_count = 0
-    response = await async_client.delete(f"/issued/{issued_id}", headers={"Authorization": f"Bearer {librarian_token}"})
+    response = await async_client.delete(
+        f"/issued/{issued_id}", headers={"Authorization": f"Bearer {librarian_token}"}
+    )
     assert response.status_code == 404
     assert response.json()["detail"] == "Issued record not found"
 
 
-
 @pytest.mark.asyncio
-async def test_delete_issued_book_invalid_id(async_client, mock_db,librarian_token):
+async def test_delete_issued_book_invalid_id(async_client, mock_db, librarian_token):
     invalid_id = "invalidid"
-    response = await async_client.delete(f"/issued/{invalid_id}", headers={"Authorization": f"Bearer {librarian_token}"})
+    response = await async_client.delete(
+        f"/issued/{invalid_id}", headers={"Authorization": f"Bearer {librarian_token}"}
+    )
     assert response.status_code == 400
     assert response.json()["detail"] == "Invalid ID"
-
-
 
 
 # Tests for Student Fine Endpoints......................................................................................................................
@@ -1125,7 +1076,7 @@ async def test_delete_issued_book_invalid_id(async_client, mock_db,librarian_tok
 #     fake_now = datetime(2024, 1, 5, 12, 0, 0)
 #     mock_datetime.now.return_value = fake_now
 #     mock_datetime.fromisoformat = datetime.fromisoformat  # keep fromisoformat usable
-    
+
 #     # Mock issued book record found (issued 5 days ago, returned late)
 #     issued_id = ObjectId("507f191e810c19729de860ea")
 #     student_id = "507f1f77bcf86cd799439012"
@@ -1168,13 +1119,10 @@ async def test_delete_issued_book_invalid_id(async_client, mock_db,librarian_tok
 #     assert data["is_paid"] is False
 
 
-
-
-
 # @pytest.mark.asyncio
-# async def test_get_student_fines(async_client, mock_student_fine_collection,librarian_token):   
+# async def test_get_student_fines(async_client, mock_student_fine_collection,librarian_token):
 #     student_id = "507f1f77bcf86cd799439012"
-    
+
 #     # Mock the find method to return an async iterator
 #     mock_student_fine_collection.find = AsyncMock(return_value=AsyncIterator([
 #         {
@@ -1196,4 +1144,3 @@ async def test_delete_issued_book_invalid_id(async_client, mock_db,librarian_tok
 #     assert isinstance(data, list)
 #     assert len(data) > 0
 #     assert data[0]["student_id"] == student_id
-

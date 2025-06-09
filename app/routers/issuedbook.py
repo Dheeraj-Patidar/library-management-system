@@ -1,12 +1,15 @@
-from fastapi import APIRouter, HTTPException,Depends,Query
+from datetime import datetime, timedelta
+
 from bson import ObjectId
 from bson.errors import InvalidId
-from app.models import IssuedBook, IssuedBookResponse,UserRole,IssuedBookUpdate
+from fastapi import APIRouter, Depends, HTTPException, Query
+
 from app.database.db import get_db
+from app.models import IssuedBook, IssuedBookResponse, IssuedBookUpdate, UserRole
 from app.routers.user import require_roles
-from datetime import datetime,timedelta
 
 router = APIRouter(prefix="/issued", tags=["IssuedBooks"])
+
 
 # Helper to convert MongoDB doc to Pydantic
 def issued_book_helper(doc) -> IssuedBookResponse:
@@ -16,11 +19,18 @@ def issued_book_helper(doc) -> IssuedBookResponse:
         student_id=str(doc["student_id"]),
         issued_date=str(doc["issued_date"]),
         return_date=str(doc["return_date"]),
-        is_returned=doc["is_returned"]
+        is_returned=doc["is_returned"],
     )
+
+
 # Create
 
-@router.post("/", response_model=IssuedBookResponse, dependencies=[Depends(require_roles(UserRole.librarian))])
+
+@router.post(
+    "/",
+    response_model=IssuedBookResponse,
+    dependencies=[Depends(require_roles(UserRole.librarian))],
+)
 async def issue_book(issue_data: IssuedBook, db=Depends(get_db)):
     issued_collection = db["issued_collection"]
     book_collection = db["book_collection"]
@@ -48,16 +58,22 @@ async def issue_book(issue_data: IssuedBook, db=Depends(get_db)):
 
     # Mark book as unavailable
     await book_collection.update_one(
-        {"_id": book_obj_id},
-        {"$set": {"is_available": False}}
+        {"_id": book_obj_id}, {"$set": {"is_available": False}}
     )
 
     # Return response
     return issued_book_helper(created)
 
+
 # Get All
-@router.get("/", response_model=list[IssuedBookResponse], dependencies=[Depends(require_roles(UserRole.librarian))])
-async def get_all_issued_books(page: int = Query(1, ge=1),size: int = Query(10, ge=1, le=100), db=Depends(get_db)):
+@router.get(
+    "/",
+    response_model=list[IssuedBookResponse],
+    dependencies=[Depends(require_roles(UserRole.librarian))],
+)
+async def get_all_issued_books(
+    page: int = Query(1, ge=1), size: int = Query(10, ge=1, le=100), db=Depends(get_db)
+):
     issued_collection = db["issued_collection"]
     issued_book_collection = db["book_collection"]
     # Validate page and size
@@ -68,8 +84,13 @@ async def get_all_issued_books(page: int = Query(1, ge=1),size: int = Query(10, 
         books.append(issued_book_helper(doc))
     return books
 
+
 # Get One
-@router.get("/{issued_id}", response_model=IssuedBookResponse, dependencies=[Depends(require_roles(UserRole.librarian))])
+@router.get(
+    "/{issued_id}",
+    response_model=IssuedBookResponse,
+    dependencies=[Depends(require_roles(UserRole.librarian))],
+)
 async def get_issued_book(issued_id: str, db=Depends(get_db)):
     issued_collection = db["issued_collection"]
     try:
@@ -82,9 +103,16 @@ async def get_issued_book(issued_id: str, db=Depends(get_db)):
         raise HTTPException(status_code=404, detail="Issued record not found")
     return issued_book_helper(doc)
 
-#update
-@router.put("/{issued_id}", response_model=IssuedBookResponse, dependencies=[Depends(require_roles(UserRole.librarian))])
-async def update_issued_book(issued_id: str, update_data: IssuedBookUpdate, db=Depends(get_db)):
+
+# update
+@router.put(
+    "/{issued_id}",
+    response_model=IssuedBookResponse,
+    dependencies=[Depends(require_roles(UserRole.librarian))],
+)
+async def update_issued_book(
+    issued_id: str, update_data: IssuedBookUpdate, db=Depends(get_db)
+):
     issued_collection = db["issued_collection"]
     book_collection = db["book_collection"]
     try:
@@ -103,26 +131,29 @@ async def update_issued_book(issued_id: str, update_data: IssuedBookUpdate, db=D
     # Re-fetch the updated issued book record
     book = await issued_collection.find_one({"_id": obj_id})
     if not book:
-        raise HTTPException(status_code=404, detail="Issued book not found after update")
+        raise HTTPException(
+            status_code=404, detail="Issued book not found after update"
+        )
 
     # Optionally update the book availability
-    
+
     book_obj_id = ObjectId(book["book_id"])
     if update_dict.get("is_returned") == True:
         await book_collection.update_one(
-            {"_id": book_obj_id},
-            {"$set": {"is_available": True}}
-            )
+            {"_id": book_obj_id}, {"$set": {"is_available": True}}
+        )
     else:
         await book_collection.update_one(
-            {"_id": book_obj_id},
-            {"$set": {"is_available": False}}
-            )
+            {"_id": book_obj_id}, {"$set": {"is_available": False}}
+        )
 
     return issued_book_helper(book)
 
+
 # Delete
-@router.delete("/{issued_id}", dependencies=[Depends(require_roles(UserRole.librarian))])
+@router.delete(
+    "/{issued_id}", dependencies=[Depends(require_roles(UserRole.librarian))]
+)
 async def delete_issued_book(issued_id: str, db=Depends(get_db)):
     issued_collection = db["issued_collection"]
     try:
